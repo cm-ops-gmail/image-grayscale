@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Darkroom — Pro Monochrome Converter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0c0b0a; --panel:#171513; --panel-2:#1f1c19;
+    --line:#332e28; --line-soft:#262220;
+    --ink:#e9e3d8; --ink-dim:#9a9389; --ink-faint:#6b655d;
+    --amber:#e8a13a; --amber-deep:#c97e1f;
+    --danger:#c0573f;
+    --shadow:0 18px 40px rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'JetBrains Mono',ui-monospace,monospace;}
+  body{
+    min-height:100vh; padding:34px 22px 70px;
+    background:
+      radial-gradient(900px 500px at 80% -10%, rgba(232,161,58,.10), transparent 60%),
+      radial-gradient(700px 500px at 0% 110%, rgba(232,161,58,.05), transparent 55%),
+      var(--bg);
+  }
+  body::after{
+    content:""; position:fixed; inset:0; pointer-events:none; opacity:.05; z-index:99;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap{max-width:1280px;margin:0 auto}
+  header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:6px}
+  h1{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(30px,5vw,52px);
+     letter-spacing:-.02em;margin:0;color:#fff;line-height:.95}
+  h1 em{font-style:italic;color:var(--amber)}
+  .tag{font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--ink-faint)}
+  .lede{color:var(--ink-dim);font-size:13px;max-width:680px;line-height:1.6;margin:8px 0 26px}
+  .lede b{color:var(--amber)}
+  kbd{background:var(--panel-2);border:1px solid var(--line);border-bottom-width:2px;
+      border-radius:5px;padding:1px 6px;font-size:11px;color:var(--ink)}
+
+  /* --- Dropzone --- */
+  .dropzone{
+    border:2px dashed var(--line); border-radius:16px; background:var(--panel);
+    padding:40px 24px 32px; text-align:center; margin-bottom:22px;
+    transition:border-color .2s, background .2s, transform .15s; cursor:pointer;
+  }
+  .dropzone:hover,.dropzone.over{border-color:var(--amber);background:var(--panel-2)}
+  .dropzone.over{transform:scale(.998)}
+  .dz-icon{color:var(--amber);margin-bottom:14px;display:flex;justify-content:center}
+  .dz-title{font-family:'Fraunces',serif;font-weight:600;font-size:18px;color:#fff;margin:0 0 5px}
+  .dz-sub{color:var(--ink-faint);font-size:10.5px;letter-spacing:.06em;margin:0 0 20px}
+  .dz-actions{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
+  .dz-hint{margin-top:16px;font-size:10px;color:var(--ink-faint);letter-spacing:.05em}
+  #fileInput{display:none}
+
+  /* --- Panel --- */
+  .panel{
+    background:linear-gradient(180deg,var(--panel-2),var(--panel));
+    border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow);
+    padding:18px 20px; margin-bottom:26px;
+  }
+  .panel.hidden{display:none}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;gap:14px;
+    margin-bottom:16px;flex-wrap:wrap}
+  .panel-head h2{font-family:'Fraunces',serif;font-weight:600;font-size:18px;margin:0;color:#fff;
+    display:flex;align-items:center;gap:10px}
+  .badge{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;
+    background:rgba(232,161,58,.14);color:var(--amber);border:1px solid rgba(232,161,58,.28);
+    border-radius:20px;padding:2px 10px;letter-spacing:.08em;text-transform:uppercase}
+  .actions{display:flex;gap:10px;flex-wrap:wrap}
+
+  /* --- Sliders --- */
+  .sliders{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:18px 26px}
+  .ctrl label{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:9px}
+  .ctrl label .val{color:var(--amber);letter-spacing:.06em;font-weight:700;font-size:12px}
+  .ctrl .hint{font-size:10px;color:var(--ink-faint);margin-top:7px;letter-spacing:.02em}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:4px;
+    background:var(--line);outline:none;margin:0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:var(--amber);border:2px solid #1a1714;cursor:pointer;box-shadow:0 0 0 1px var(--amber-deep)}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--amber);
+    border:2px solid #1a1714;cursor:pointer}
+
+  /* --- Toggles & filter chips --- */
+  .row-toggles{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;
+    margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft)}
+  .toggle{display:flex;align-items:center;gap:9px;font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--ink-dim);cursor:pointer;user-select:none}
+  .toggle input{accent-color:var(--amber);width:15px;height:15px;cursor:pointer}
+  .filter-group{display:flex;flex-direction:column;gap:8px}
+  .filter-label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint)}
+  .filter-grid{display:flex;flex-wrap:wrap;gap:6px}
+  .filter-grid button{
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    color:var(--ink-dim);padding:5px 12px;cursor:pointer;
+    font-family:inherit;font-size:10px;letter-spacing:.10em;text-transform:uppercase;transition:.15s;
+  }
+  .filter-grid button:hover{border-color:var(--amber);color:var(--ink)}
+  .filter-grid button.on{background:var(--amber);border-color:var(--amber);color:#1a1410;font-weight:700}
+
+  /* --- Buttons --- */
+  .btn{font-family:inherit;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--ink);
+    padding:8px 14px;border-radius:8px;cursor:pointer;transition:.15s;
+    text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+  .btn:hover{border-color:var(--amber);color:#fff}
+  .btn.primary{background:var(--amber);border-color:var(--amber);color:#1a1410;font-weight:700}
+  .btn.primary:hover{background:#f2af4d}
+  .btn.ghost-danger{color:var(--danger);border-color:transparent}
+  .btn.ghost-danger:hover{border-color:var(--danger);color:#e07359}
+
+  /* --- Gallery & Cards --- */
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+    box-shadow:var(--shadow);transition:transform .18s,border-color .18s}
+  .card:hover{transform:translateY(-3px);border-color:#4a423a}
+  .canvas-wrap{
+    position:relative;
+    background:repeating-conic-gradient(#1b1916 0% 25%, #141210 0% 50%) 50%/22px 22px;
+  }
+  .card canvas{width:100%;height:auto;display:block}
+  .card-overlay{
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    opacity:0;background:rgba(0,0,0,0);
+    transition:opacity .2s,background .2s;pointer-events:none;
+  }
+  .card:hover .card-overlay{opacity:1;background:rgba(0,0,0,.48);pointer-events:all}
+  .overlay-btn{font-size:10.5px;padding:9px 16px}
+  .card-info{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:11px 13px;border-top:1px solid var(--line-soft)}
+  .card-info .meta{min-width:0}
+  .card-info .name{font-size:11.5px;color:var(--ink);white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:150px}
+  .card-info .dim{font-size:10px;color:var(--ink-faint);margin-top:2px}
+  .empty{color:var(--ink-faint);font-size:12px;text-align:center;padding:30px;letter-spacing:.05em}
+
+  /* --- Toast --- */
+  .toast{
+    position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(14px);
+    background:var(--amber);color:#1a1410;font-weight:700;
+    padding:10px 22px;border-radius:8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    opacity:0;transition:opacity .22s,transform .22s;pointer-events:none;z-index:200;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Dark<em>room</em></h1>
+    <span class="tag">Perceptual Monochrome Lab</span>
+  </header>
+  <p class="lede">
+    Tones mixed in <b>linear light</b> and shaped in <b>CIE&nbsp;L*</b> space.
+    <b>Clarity</b> lifts broad shading; <b>Structure</b> pops fine texture and edges.
+    Defaults to <b>Red filter</b> for punchy skies and warm skin tones.
+    Exports <b>lossless PNG</b> at original resolution.
+  </p>
+
+  <div class="dropzone" id="dropZone">
+    <div class="dz-icon">
+      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 16 12 12 8 16"/>
+        <line x1="12" y1="12" x2="12" y2="21"/>
+        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+      </svg>
+    </div>
+    <p class="dz-title">Drop images here</p>
+    <p class="dz-sub">JPEG &nbsp;·&nbsp; PNG &nbsp;·&nbsp; WEBP &nbsp;·&nbsp; TIFF &nbsp;·&nbsp; BMP &nbsp;·&nbsp; HEIC &nbsp;&nbsp;— batches welcome</p>
+    <div class="dz-actions">
+      <button class="btn primary" id="browseBtn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Browse files
+      </button>
+    </div>
+    <p class="dz-hint">or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd></p>
+    <input type="file" id="fileInput" multiple accept="image/*">
+  </div>
+
+  <div class="panel hidden" id="controls">
+    <div class="panel-head">
+      <h2>Develop <span class="badge" id="imgCount"></span></h2>
+      <div class="actions">
+        <button class="btn" id="resetBtn">Reset</button>
+        <button class="btn primary" id="dlAllBtn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download all
+        </button>
+        <button class="btn ghost-danger" id="clearBtn">Clear all</button>
+      </div>
+    </div>
+
+    <div class="sliders">
+      <div class="ctrl">
+        <label for="contrast">Contrast <span class="val" id="contrastV">20</span></label>
+        <input type="range" id="contrast" min="0" max="100" value="20">
+        <div class="hint">Clip-free S-curve around midtones</div>
+      </div>
+      <div class="ctrl">
+        <label for="shadows">Shadow Depth <span class="val" id="shadowsV">8</span></label>
+        <input type="range" id="shadows" min="-100" max="100" value="8">
+        <div class="hint">+ deepens darks · − opens them</div>
+      </div>
+      <div class="ctrl">
+        <label for="highlights">Highlights <span class="val" id="highlightsV">0</span></label>
+        <input type="range" id="highlights" min="-100" max="100" value="0">
+        <div class="hint">+ brightens · − recovers detail</div>
+      </div>
+      <div class="ctrl">
+        <label for="clarity">Clarity <span class="val" id="clarityV">15</span></label>
+        <input type="range" id="clarity" min="0" max="100" value="15">
+        <div class="hint">Broad local contrast — shading &amp; form</div>
+      </div>
+      <div class="ctrl">
+        <label for="structure">Structure <span class="val" id="structureV">10</span></label>
+        <input type="range" id="structure" min="0" max="100" value="10">
+        <div class="hint">Fine local contrast — texture &amp; edges</div>
+      </div>
+      <div class="ctrl">
+        <label for="exposure">Exposure <span class="val" id="exposureV">0</span></label>
+        <input type="range" id="exposure" min="-100" max="100" value="0">
+        <div class="hint">Overall brightness in perceptual L*</div>
+      </div>
+      <div class="ctrl">
+        <label for="grain">Film Grain <span class="val" id="grainV">0</span></label>
+        <input type="range" id="grain" min="0" max="100" value="0">
+        <div class="hint">Analog noise added to output pixels</div>
+      </div>
+    </div>
+
+    <div class="row-toggles">
+      <label class="toggle"><input type="checkbox" id="dither" checked> Gradient dithering</label>
+      <div class="filter-group">
+        <div class="filter-label">Film filter</div>
+        <div class="filter-grid" id="weightSeg">
+          <button data-w="red" class="on">Red</button>
+          <button data-w="orange">Orange</button>
+          <button data-w="yellow">Yellow</button>
+          <button data-w="green">Green</button>
+          <button data-w="infrared">Infrared</button>
+          <button data-w="rec709">Rec.709</button>
+          <button data-w="equal">Equal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="gallery" id="gallery">
+    <div class="empty" id="emptyState">No frames loaded yet — drop something in.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   COLOR PIPELINE
+   sRGB byte → linear light → weighted luminance Y
+             → CIE L* → Clarity + Structure → tone shaping
+             → back to linear → sRGB → TPDF dither + grain → 8-bit
+   ============================================================ */
+
+const LIN = new Float32Array(256);
+for (let i = 0; i < 256; i++) {
+  const c = i / 255;
+  LIN[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+function linToSrgb(c) {
+  c = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  return c * 255;
+}
+function YtoL(Y) { return Y > 0.008856 ? 116 * Math.cbrt(Y) - 16 : 903.3 * Y; }
+function LtoY(L) { return L > 8 ? Math.pow((L + 16) / 116, 3) : L / 903.3; }
+
+const Y2L_N = 4096, Y2L = new Float32Array(Y2L_N);
+for (let i = 0; i < Y2L_N; i++) Y2L[i] = YtoL(i / (Y2L_N - 1));
+
+const WEIGHTS = {
+  rec709:   [0.2126, 0.7152, 0.0722],  // physically-correct luminance
+  equal:    [1/3, 1/3, 1/3],           // flat average
+  red:      [0.62, 0.31, 0.07],        // dark sky, bright skin — high drama
+  orange:   [0.52, 0.37, 0.11],        // mellower version of red filter
+  yellow:   [0.36, 0.47, 0.17],        // natural-looking, good foliage contrast
+  green:    [0.10, 0.65, 0.25],        // bright foliage, darkens skin slightly
+  infrared: [0.78, 0.22, 0.00],        // blown highlights on foliage, black sky
+};
+
+const smoother = x => x * x * x * (x * (x * 6 - 15) + 10);
+
+function buildToneLUT(p) {
+  const N = 1024, lut = new Float32Array(N);
+  const c = p.contrast / 100, sh = p.shadows / 100;
+  const hi = p.highlights / 100, ex = p.exposure / 100;
+  for (let k = 0; k < N; k++) {
+    let l = k / (N - 1);
+    l += ex * 0.5;
+    const S = smoother(Math.min(1, Math.max(0, l)));
+    l = l + c * (S - l);
+    const ws = (1 - l); l -= sh * 0.5 * ws * ws;
+    l += hi * 0.5 * l * l;
+    l = Math.min(1, Math.max(0, l));
+    lut[k] = linToSrgb(LtoY(l * 100));
+  }
+  return lut;
+}
+
+function boxBlur(src, w, h, r) {
+  const win = r * 2 + 1, tmp = new Float32Array(w * h), out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const o = y * w; let sum = 0;
+    for (let k = -r; k <= r; k++) sum += src[o + Math.min(w - 1, Math.max(0, k))];
+    tmp[o] = sum / win;
+    for (let x = 1; x < w; x++) {
+      sum += src[o + Math.min(w - 1, x + r)] - src[o + Math.max(0, x - r - 1)];
+      tmp[o + x] = sum / win;
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let k = -r; k <= r; k++) sum += tmp[Math.min(h - 1, Math.max(0, k)) * w + x];
+    out[x] = sum / win;
+    for (let y = 1; y < h; y++) {
+      sum += tmp[Math.min(h - 1, y + r) * w + x] - tmp[Math.max(0, y - r - 1) * w + x];
+      out[y * w + x] = sum / win;
+    }
+  }
+  return out;
+}
+
+/* ============================================================
+   APP
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const dropZone = $('dropZone'), fileInput = $('fileInput'), gallery = $('gallery');
+const controls = $('controls'), emptyState = $('emptyState');
+
+const params = {
+  contrast: 20, shadows: 8, highlights: 0,
+  clarity: 15, structure: 10, exposure: 0, grain: 0,
+  dither: true, weights: 'red'
+};
+let images = [], uid = 0, rafPending = false;
+
+// ---- drag / drop / paste ----
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => window.addEventListener(e, ev => ev.preventDefault()));
+dropZone.addEventListener('dragenter', () => dropZone.classList.add('over'));
+dropZone.addEventListener('dragover',  () => dropZone.classList.add('over'));
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  dropZone.classList.remove('over');
+  if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+});
+dropZone.addEventListener('click', e => { if (!e.target.closest('button')) fileInput.click(); });
+$('browseBtn').addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+fileInput.addEventListener('change', e => { if (e.target.files.length) addFiles(e.target.files); });
+window.addEventListener('paste', e => {
+  const files = [];
+  for (const it of (e.clipboardData || window.clipboardData).items)
+    if (it.type.indexOf('image') !== -1) files.push(it.getAsFile());
+  if (files.length) addFiles(files);
+});
+
+// ---- slider wiring ----
+[['contrast','contrastV'],['shadows','shadowsV'],['highlights','highlightsV'],
+ ['clarity','clarityV'],['structure','structureV'],['exposure','exposureV'],['grain','grainV']
+].forEach(([id, vid]) => {
+  $(id).addEventListener('input', e => {
+    params[id] = +e.target.value; $(vid).textContent = e.target.value; scheduleRender();
+  });
+});
+$('dither').addEventListener('change', e => { params.dither = e.target.checked; scheduleRender(); });
+$('weightSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+  $('weightSeg').querySelectorAll('button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); params.weights = b.dataset.w;
+  images.forEach(im => { im.Lbase = null; im.Lblur_c = null; im.Lblur_s = null; });
+  scheduleRender();
+}));
+$('resetBtn').addEventListener('click', resetParams);
+$('clearBtn').addEventListener('click', clearAll);
+$('dlAllBtn').addEventListener('click', downloadAll);
+
+// ---- loading images ----
+function addFiles(files) {
+  controls.classList.remove('hidden');
+  emptyState.style.display = 'none';
+  Array.from(files).forEach(file => {
+    if (!file.type.match('image.*')) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => registerImage(img, file.name || 'pasted.png');
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function registerImage(img, name) {
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const off = document.createElement('canvas');
+  off.width = w; off.height = h;
+  const octx = off.getContext('2d', { willReadFrequently: true });
+  octx.drawImage(img, 0, 0);
+  const srcData = octx.getImageData(0, 0, w, h).data;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="canvas-wrap">
+      <div class="card-overlay">
+        <button class="btn primary overlay-btn" data-action="dl">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
+        </button>
+        <button class="btn overlay-btn" data-action="cp">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy
+        </button>
+      </div>
+    </div>
+    <div class="card-info">
+      <div class="meta">
+        <div class="name">${escapeHtml(name)}</div>
+        <div class="dim">${w} × ${h} px &nbsp;·&nbsp; mono</div>
+      </div>
+      <button class="btn" data-action="dl" style="white-space:nowrap;font-size:10.5px">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        PNG
+      </button>
+    </div>`;
+
+  card.querySelector('.canvas-wrap').insertBefore(canvas, card.querySelector('.card-overlay'));
+  gallery.insertBefore(card, emptyState);
+
+  const item = {
+    id: ++uid, name, srcData, w, h,
+    Lbase: null, Lblur_c: null, Lblur_s: null,
+    blurR: Math.max(2, Math.min(40, Math.round(Math.min(w, h) / 90))),
+    canvas, card
+  };
+  card.querySelectorAll('[data-action="dl"]').forEach(b => b.addEventListener('click', () => downloadOne(item)));
+  card.querySelectorAll('[data-action="cp"]').forEach(b => b.addEventListener('click', () => copyOne(item)));
+  images.push(item);
+  updateCount();
+  renderItem(item);
+}
+
+// ---- rendering ----
+function scheduleRender() {
+  if (rafPending) return;
+  rafPending = true;
+  requestAnimationFrame(() => {
+    rafPending = false;
+    const lut = buildToneLUT(params);
+    images.forEach(im => renderItem(im, lut));
+  });
+}
+
+function renderItem(item, lut) {
+  lut = lut || buildToneLUT(params);
+  const { w, h, srcData } = item;
+  const N1 = 1023, npx = w * h;
+
+  // 1) Base L* plane — cached per image+weight combination
+  if (!item.Lbase) {
+    const [wr, wg, wb] = WEIGHTS[params.weights];
+    const L = new Float32Array(npx);
+    for (let i = 0, p = 0; i < srcData.length; i += 4, p++) {
+      const Y = wr * LIN[srcData[i]] + wg * LIN[srcData[i + 1]] + wb * LIN[srcData[i + 2]];
+      L[p] = Y2L[(Y * (Y2L_N - 1) + 0.5) | 0];
+    }
+    item.Lbase = L;
+  }
+
+  // 2) Clarity (broad radius) + Structure (fine radius) unsharp masks in L* space
+  const useC = params.clarity > 0, useS = params.structure > 0;
+  let Lwork = item.Lbase;
+  if (useC || useS) {
+    if (useC && !item.Lblur_c)
+      item.Lblur_c = boxBlur(item.Lbase, w, h, item.blurR);
+    if (useS && !item.Lblur_s)
+      item.Lblur_s = boxBlur(item.Lbase, w, h, Math.max(1, Math.round(item.blurR * 0.14)));
+    const ca = params.clarity / 100 * 1.4;
+    const sa = params.structure / 100 * 0.75;
+    Lwork = new Float32Array(npx);
+    for (let p = 0; p < npx; p++) {
+      let v = item.Lbase[p];
+      if (useC) v += ca * (item.Lbase[p] - item.Lblur_c[p]);
+      if (useS) v += sa * (item.Lbase[p] - item.Lblur_s[p]);
+      Lwork[p] = v < 0 ? 0 : v > 100 ? 100 : v;
+    }
+  }
+
+  // 3) Tone-map through LUT, TPDF dither, optional film grain, write 8-bit
+  const out = new ImageData(w, h);
+  const od = out.data;
+  const useDither = params.dither;
+  const grainAmt = params.grain / 100 * 14;
+  for (let p = 0, i = 0; p < npx; p++, i += 4) {
+    const f = Lwork[p] * 0.01 * N1;
+    let idx = f | 0; if (idx >= N1) idx = N1 - 1;
+    const t = f - idx;
+    let v = lut[idx] + (lut[idx + 1] - lut[idx]) * t;
+    if (useDither) v += (Math.random() + Math.random() - 1);
+    if (grainAmt > 0) v += (Math.random() + Math.random() - 1) * grainAmt;
+    v = v < 0 ? 0 : v > 255 ? 255 : (v + 0.5) | 0;
+    od[i] = od[i + 1] = od[i + 2] = v;
+    od[i + 3] = srcData[i + 3];
+  }
+  item.canvas.getContext('2d').putImageData(out, 0, 0);
+}
+
+// ---- export ----
+function downloadOne(item) {
+  item.canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `mono_${item.name.replace(/\.[^.]+$/, '')}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+}
+
+async function copyOne(item) {
+  item.canvas.toBlob(async blob => {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      showToast('Copied to clipboard');
+    } catch {
+      downloadOne(item);
+      showToast('Clipboard blocked — downloading instead');
+    }
+  }, 'image/png');
+}
+
+function downloadAll() { images.forEach((im, k) => setTimeout(() => downloadOne(im), k * 250)); }
+
+// ---- misc ----
+function updateCount() {
+  const n = images.length;
+  $('imgCount').textContent = n ? `${n} frame${n > 1 ? 's' : ''}` : '';
+}
+
+function resetParams() {
+  Object.assign(params, { contrast: 20, shadows: 8, highlights: 0, clarity: 15, structure: 10, exposure: 0, grain: 0 });
+  [['contrast',20],['shadows',8],['highlights',0],['clarity',15],['structure',10],['exposure',0],['grain',0]].forEach(([id, v]) => {
+    $(id).value = v; $(id + 'V').textContent = v;
+  });
+  scheduleRender();
+}
+
+function clearAll() {
+  images = [];
+  gallery.innerHTML = '';
+  gallery.appendChild(emptyState); emptyState.style.display = 'block';
+  controls.classList.add('hidden'); fileInput.value = '';
+  updateCount();
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>
